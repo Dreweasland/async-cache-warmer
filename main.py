@@ -10,11 +10,13 @@ import argparse
 from tabulate import tabulate
 
 
-parser = argparse.ArgumentParser(description='Asynchronous Magento Cache Warmer')
+parser = argparse.ArgumentParser(description='Asynchronous Cache Warmer')
 parser.add_argument('-s','--site', action="append", dest='sites', default=None)
+parser.add_argument('-H','--host', action="store", dest='host', default=None)
 parser.add_argument('-l','--limit', action="store", dest='limit', default=None)
 args = parser.parse_args()
 limit = args.limit
+host = args.host
 sites = args.sites
 
 
@@ -38,7 +40,7 @@ def get_links(mage_links):
     links=[]
     for sitemap in root:
         children = sitemap.getchildren()
-        links.append(children[0].text)
+        links.append("https://" + host + children[0].text)
     return links
 
 
@@ -61,13 +63,10 @@ async def warm_it(url):
         def __init__(self, *args, **kwargs):
             super().__init__(*args, **kwargs)
             self._factory = functools.partial(TimedResponseHandler, loop=loop)
-
-        async def _create_connection(self, req):
             nonlocal connection_started_time
             connection_started_time = datetime.datetime.now()
-            return await super()._create_connection(req)
 
-    async with aiohttp.ClientSession(connector=TimedTCPConnector(loop=loop)) as session:
+    async with aiohttp.ClientSession(connector=TimedTCPConnector(loop=loop, ssl=False)) as session:
         async with session.get(url) as response:
             time_delta=connection_made_time - connection_started_time
             time_taken="%s sec %s microsec" % (time_delta.seconds, time_delta.microseconds)
